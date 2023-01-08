@@ -115,7 +115,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // create order
         let order = OrderRequest::new(target_exposure - account_exposure, "EUR_USD".to_string());
 
-        //println!("Trading : {}", target_exposure - account_exposure);
+        eprintln!("Trading : {} to reach {} at price {:.5}", target_exposure - account_exposure, target_exposure, hedger.tentative_price);
 
         client.post_order_request(&order).await.map_or(
             eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),

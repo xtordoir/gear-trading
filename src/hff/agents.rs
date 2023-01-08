@@ -52,6 +52,23 @@ pub struct GearHedger {
  }
 
 impl GearHedger {
+
+    pub fn constant(exposure: f64) -> Self {
+        Self {
+            max_exposure: exposure.abs(),
+            gear_f: Gear::constant(exposure as i64),
+            scale: 0.0010,
+
+            lastTradePrice: 1.0,
+            nextBuyPrice: 1.0,
+            nextSellPrice: 1.0,
+
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            tentative_price: 1.0,
+            tentative_exposure: 0,
+        }
+    }
+
     pub fn symetric(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
         let zero_price = (price0 + price1)/2.0;
         Self {

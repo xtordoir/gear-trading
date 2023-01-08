@@ -36,6 +36,16 @@ pub struct Gear {
 
 impl Gear {
 
+    pub fn constant(dir: i64) -> Self {
+        Self {
+            p_0: 1.0,
+            g_0: if dir > 0 { 1.0} else { -1.0 },
+            g_i: vec![],
+            p_n: 1.0,
+            g_n: if dir > 0 { 1.0} else { -1.0 },
+        }
+    }
+
     //
     pub fn symetric(price0: f64, price1:f64) -> Self {
         Self {
@@ -88,6 +98,18 @@ mod tests {
         assert_eq!(gear.g(2.0), -1.0);
     }
 
+ #[test]
+    fn constant_minus() {
+        let gear = Gear::constant(-1);
+        assert_eq!(gear.g(0.25), -1.0);
+        assert_eq!(gear.g(1.5), -1.0);
+    }
+ #[test]
+    fn constant_plus() {
+        let gear = Gear::constant(1);
+        assert_eq!(gear.g(0.25), 1.0);
+        assert_eq!(gear.g(1.5), 1.0);
+    }
 
 
 }
