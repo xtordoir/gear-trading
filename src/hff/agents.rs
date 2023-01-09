@@ -7,7 +7,22 @@ use super::quote::Tick;
 use super::account::OrderFill;
 use super::super::{Gear, GearRange};
 
+#[derive(Debug,Deserialize,Serialize, Clone)]
+pub enum GAgent {
+    Buy{price0: f64, price1: f64, scale: f64, exposure: f64},
+    Sell{price0: f64, price1: f64, scale: f64, exposure: f64},
+}
 
+impl GAgent {
+    pub fn build(&self) -> Option<GearHedger> {
+
+        match self {
+            GAgent::Buy{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::buyer(*price0, *price1, *scale, *exposure)),
+            GAgent::Sell{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::seller(*price0, *price1, *scale, *exposure)),
+            _ => None,
+        }
+    }
+}
 pub trait Agent {
 
     // computes the status of the Agent: should it be closed
