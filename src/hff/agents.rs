@@ -53,6 +53,38 @@ pub struct GearHedger {
 
 impl GearHedger {
 
+    pub fn buyer(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+        Self {
+            max_exposure: max_exposure,
+            gear_f: Gear::positive(price0, price1),
+            scale: scale,
+
+            lastTradePrice: price1,
+            nextBuyPrice: price1,
+            nextSellPrice: price1,
+
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            tentative_price: price1,
+            tentative_exposure: 0,
+        }
+    }
+
+    pub fn seller(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+        Self {
+            max_exposure: max_exposure,
+            gear_f: Gear::negative(price0, price1),
+            scale: scale,
+
+            lastTradePrice: price0,
+            nextBuyPrice: price0,
+            nextSellPrice: price0,
+
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            tentative_price: price0,
+            tentative_exposure: 0,
+        }
+    }
+
     pub fn constant(exposure: f64) -> Self {
         Self {
             max_exposure: exposure.abs(),
@@ -69,11 +101,11 @@ impl GearHedger {
         }
     }
 
-    pub fn symetric(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+    pub fn symmetric(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
         let zero_price = (price0 + price1)/2.0;
         Self {
             max_exposure: max_exposure,
-            gear_f: Gear::symetric(price0, price1),
+            gear_f: Gear::symmetric(price0, price1),
             scale: 0.0010,
 
             lastTradePrice: zero_price,
@@ -277,7 +309,7 @@ mod tests {
 
     #[test]
     fn symetric() {
-        let mut gear = GearHedger::symetric(0.80, 1.20, 0.0010, 100000.0);
+        let mut gear = GearHedger::symmetric(0.80, 1.20, 0.0010, 100000.0);
         
         gear.next_exposure(&Tick{time:0, bid: 0.7000, ask: 0.7001,});
         gear.update_on_fill(&OrderFill{price: gear.tentative_price, units: gear.tentative_exposure});

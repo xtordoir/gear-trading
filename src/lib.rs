@@ -36,6 +36,36 @@ pub struct Gear {
 
 impl Gear {
 
+    pub fn positive(price0: f64, price1: f64) -> Self {
+        Self {
+            p_0: price0,
+            g_0: 1.0,
+            g_i: vec![GearRange{
+                p_start: price0,
+                g_start: 1.0,
+                p_end: price1,
+                g_end: 0.0,
+            }],
+            p_n: price1,
+            g_n: 0.0,
+        }
+    }
+
+    pub fn negative(price0: f64, price1: f64) -> Self {
+        Self {
+            p_0: price0,
+            g_0: 0.0,
+            g_i: vec![GearRange{
+                p_start: price0,
+                g_start: 0.0,
+                p_end: price1,
+                g_end: -1.0,
+            }],
+            p_n: price1,
+            g_n: -1.0,
+        }
+    }
+
     pub fn constant(dir: i64) -> Self {
         Self {
             p_0: 1.0,
@@ -47,7 +77,7 @@ impl Gear {
     }
 
     //
-    pub fn symetric(price0: f64, price1:f64) -> Self {
+    pub fn symmetric(price0: f64, price1:f64) -> Self {
         Self {
             p_0: price0,
             g_0: 1.0,
@@ -87,8 +117,8 @@ mod tests {
     }
 
     #[test]
-    fn symetric() {
-        let gear = Gear::symetric(0.5, 1.5);
+    fn symmetric() {
+        let gear = Gear::symmetric(0.5, 1.5);
         assert_eq!(gear.g(0.25), 1.0);
         assert_eq!(gear.g(0.5), 1.0);
         assert_eq!(gear.g(0.75), 0.5);

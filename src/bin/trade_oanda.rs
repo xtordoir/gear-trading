@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .as_deref()
         .map(|f| {
             let hstr = fs::read_to_string(f).ok();
-            hstr.map(|s| serde_json::from_str::<GearHedger>(s.as_str()).ok())
+            hstr.map(|s| serde_json::from_str::<AgentInventory<GearHedger>>(s.as_str()).ok())
                 .flatten()
         })
         .flatten();
@@ -65,17 +65,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         oanda_api_key.clone(),
     );
     let mut hedger =
-        hedger_opt.unwrap_or_else(|| GearHedger::symetric(1.0150, 1.0650, 0.0010, 422500.0));
+        hedger_opt.unwrap_or_else(|| {
+            let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
+            inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
+            inventory
+        });
+        //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
     println!("{}", hedger_str);
 
-    // let mut inventory: AgentInventory<DriftingHedge> = AgentInventory::new();
-    // inventory.agents.insert(String::from("seller"), hedger.clone());
+    //let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
+    //inventory.agents.insert(String::from("shortloser"), hedger.clone());
     // inventory.agents.insert(String::from("bias"), DriftingHedge::new(4.0000, 422500, 2.0000));
 
-    // let inv_str = serde_json::to_string(&inventory).ok().unwrap();
-    // println!("{}", inv_str);
+    //let inv_str = serde_json::to_string(&inventory).ok().unwrap();
+    //println!("{}", inv_str);
 
     loop {
         // control loop counts and timing
@@ -109,13 +114,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // no trade
         if target_exposure == account_exposure {
+
             continue;
         }
 
         // create order
         let order = OrderRequest::new(target_exposure - account_exposure, "EUR_USD".to_string());
 
-        eprintln!("Trading : {} to reach {} at price {:.5}", target_exposure - account_exposure, target_exposure, hedger.tentative_price);
+        eprintln!("Trading : {} to reach {} at price", target_exposure - account_exposure, target_exposure);
 
         client.post_order_request(&order).await.map_or(
             eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),
