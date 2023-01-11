@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut hedger =
         hedger_opt.unwrap_or_else(|| {
             let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
-            inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
+            inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 0.0010, 422500.0));
             inventory
         });
         //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
