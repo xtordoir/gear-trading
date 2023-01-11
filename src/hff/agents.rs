@@ -17,8 +17,8 @@ impl GAgent {
     pub fn build(&self) -> Option<GearHedger> {
 
         match self {
-            GAgent::Buy{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::buyer(*price0, *price1, *scale, *exposure)),
-            GAgent::Sell{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::seller(*price0, *price1, *scale, *exposure)),
+            GAgent::Buy{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::buyer(*price0, *price1, *scale, *scale, *exposure)),
+            GAgent::Sell{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::seller(*price0, *price1, *scale, *scale, *exposure)),
             _ => None,
         }
     }
@@ -50,7 +50,8 @@ pub struct GearHedger {
     pub max_exposure: f64,
     pub gear_f: Gear,
     // steps on the grid
-    pub scale:  f64,
+    pub scaleUp:  f64,
+    pub scaleDown:  f64,
 
     // next trades on the buy and sell sides
     pub lastTradePrice: f64,
@@ -68,11 +69,12 @@ pub struct GearHedger {
 
 impl GearHedger {
 
-    pub fn buyer(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+    pub fn buyer(price0: f64, price1: f64, scaleUp: f64, scaleDown: f64, max_exposure: f64) -> Self {
         Self {
             max_exposure: max_exposure,
             gear_f: Gear::positive(price0, price1),
-            scale: scale,
+            scaleUp: scaleUp,
+            scaleDown: scaleDown,
 
             lastTradePrice: price1,
             nextBuyPrice: price1,
@@ -84,11 +86,12 @@ impl GearHedger {
         }
     }
 
-    pub fn seller(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+    pub fn seller(price0: f64, price1: f64, scaleUp: f64, scaleDown: f64, max_exposure: f64) -> Self {
         Self {
             max_exposure: max_exposure,
             gear_f: Gear::negative(price0, price1),
-            scale: scale,
+            scaleUp:  scaleUp,
+            scaleDown:  scaleDown,
 
             lastTradePrice: price0,
             nextBuyPrice: price0,
@@ -104,7 +107,8 @@ impl GearHedger {
         Self {
             max_exposure: exposure.abs(),
             gear_f: Gear::constant(exposure as i64),
-            scale: 0.0010,
+            scaleUp: 1.0,
+            scaleDown: 1.0,
 
             lastTradePrice: 1.0,
             nextBuyPrice: 1.0,
@@ -116,12 +120,13 @@ impl GearHedger {
         }
     }
 
-    pub fn symmetric(price0: f64, price1: f64, scale: f64, max_exposure: f64) -> Self {
+    pub fn symmetric(price0: f64, price1: f64, scaleUp: f64, scaleDown: f64, max_exposure: f64) -> Self {
         let zero_price = (price0 + price1)/2.0;
         Self {
             max_exposure: max_exposure,
             gear_f: Gear::symmetric(price0, price1),
-            scale: 0.0010,
+            scaleUp:  scaleUp,
+            scaleDown:  scaleDown,
 
             lastTradePrice: zero_price,
             nextBuyPrice: zero_price,
@@ -178,13 +183,13 @@ impl Agent for GearHedger {
         if traded < 0 {
             self.agentPL.sell(order_fill.price, traded.abs());
             self.lastTradePrice = order_fill.price;
-            self.nextSellPrice = order_fill.price + self.scale;
-            self.nextBuyPrice = order_fill.price - self.scale;
+            self.nextSellPrice = order_fill.price + self.scaleUp;
+            self.nextBuyPrice = order_fill.price - self.scaleDown;
         } else if traded > 0 {
             self.agentPL.buy(order_fill.price, traded.abs());
             self.lastTradePrice = order_fill.price;
-            self.nextBuyPrice = order_fill.price - self.scale;
-            self.nextSellPrice = order_fill.price + self.scale;
+            self.nextBuyPrice = order_fill.price - self.scaleDown;
+            self.nextSellPrice = order_fill.price + self.scaleUp;
         }
     }
 
