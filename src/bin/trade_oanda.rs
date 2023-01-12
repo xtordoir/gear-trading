@@ -108,7 +108,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // compare target exposure with actual
         let target_exposure = hedger.next_exposure(&tick);
-        let account_exposure = positions.first().map_or_else(|| 0, |p| p.units);
+        let account_exposure = positions.iter().filter(|p| p.instrument == "EUR_USD").last().map_or_else(|| 0, |p| p.units);
         //println!("Target Exposure: {}", target_exposure);
         //println!("Actual Exposure: {}", account_exposure);
 
