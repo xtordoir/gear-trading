@@ -29,8 +29,13 @@ impl Client {
             .send()
             .await;
 
-        let ret: Result<PricingResponse, _> = response.unwrap().json().await;
-        ret.ok()
+        //let ret: Result<PricingResponse, _> = response.unwrap().json().await;
+        //ret.ok()
+        if let Some(res) = response.ok() {
+            return res.json().await.ok();
+        }
+
+        None
     }
 
     pub async fn get_open_positions(&self,) -> Option<OpenPositionsResponse> {
