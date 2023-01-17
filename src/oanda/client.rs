@@ -47,10 +47,12 @@ impl Client {
 //        }
 //        println!("open positions call result... {:?}", response);
 
-
-        let ret: Result<OpenPositionsResponse, _> = response.unwrap().json().await;
-        ret.ok()
-        //None
+        if let Some(res) = response.ok() {
+            return res.json().await.ok();
+        }
+    //    let ret: Result<OpenPositionsResponse, _> = response.unwrap().json().await;
+    //    ret.ok()
+        None
     }
 
     pub async fn post_order_request(&self, order: &OrderRequest) -> Option<PostOrderResponse> {
@@ -62,8 +64,13 @@ impl Client {
             .json(&order)
             .send()
             .await;
-        let ret: Result<PostOrderResponse, _> = response.unwrap().json().await;
-        ret.ok()
+
+        if let Some(res) = response.ok() {
+            return res.json().await.ok();
+        }
+        None
+        //let ret: Result<PostOrderResponse, _> = response.unwrap().json().await;
+        //ret.ok()
     }
 
 
