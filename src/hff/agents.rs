@@ -11,6 +11,7 @@ use super::super::{Gear, GearRange};
 pub enum GAgent {
     Buy{price0: f64, price1: f64, scale: f64, exposure: f64},
     Sell{price0: f64, price1: f64, scale: f64, exposure: f64},
+    JumpLong{price0: f64, scale: f64, exposure: f64},
 }
 
 impl GAgent {
@@ -19,6 +20,7 @@ impl GAgent {
         match self {
             GAgent::Buy{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::buyer(*price0, *price1, *scale, *scale, *exposure)),
             GAgent::Sell{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::seller(*price0, *price1, *scale, *scale, *exposure)),
+            GAgent::JumpLong { price0: price0, scale: scale, exposure: exposure } => Some(GearHedger::jump(*price0, 1.0, 0.0, *scale, *scale, *exposure)),
             _ => None,
         }
     }
@@ -134,6 +136,22 @@ impl GearHedger {
 
             agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
             tentative_price: zero_price,
+            tentative_exposure: 0,
+        }
+    }
+    pub fn jump(price0: f64, g_0: f64, g_1: f64, scaleUp: f64, scaleDown: f64, max_exposure: f64) -> Self {
+        Self {
+            max_exposure: max_exposure,
+            gear_f: Gear::jump(price0, g_0, g_1),
+            scaleUp:  scaleUp,
+            scaleDown:  scaleDown,
+
+            lastTradePrice: price0,
+            nextBuyPrice: price0,
+            nextSellPrice: price0,
+
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            tentative_price: price0,
             tentative_exposure: 0,
         }
     }

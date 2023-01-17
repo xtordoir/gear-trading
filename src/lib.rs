@@ -92,6 +92,16 @@ impl Gear {
         }
     }
 
+    pub fn jump(price0: f64, g_0: f64, g_n: f64) -> Self {
+        Self {
+            p_0: price0,
+            g_0: g_0,
+            g_i: vec![],
+            p_n: price0,
+            g_n: g_n,
+        }
+    }
+
     pub fn g(&self, x: f64) -> f64 {
         if x < self.p_0 {return self.g_0;}
         if x >= self.p_n {return self.g_n;}
