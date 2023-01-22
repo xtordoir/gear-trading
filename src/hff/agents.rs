@@ -27,6 +27,10 @@ impl GAgent {
 }
 pub trait Agent {
 
+    // active status
+    fn is_active(&self) -> bool;
+    fn deactivate(&mut self);
+
     // computes the status of the Agent: should it be closed
     fn to_be_closed(&self) -> bool;
 
@@ -55,6 +59,10 @@ pub struct GearHedger {
     pub scaleUp:  f64,
     pub scaleDown:  f64,
 
+    // activation status and PL target
+    pub active: bool,
+    pub target: f64,
+
     // next trades on the buy and sell sides
     pub lastTradePrice: f64,
     pub nextBuyPrice: f64,
@@ -78,6 +86,9 @@ impl GearHedger {
             scaleUp: scaleUp,
             scaleDown: scaleDown,
 
+            active: true,
+            target: f64::MAX,
+
             lastTradePrice: price1,
             nextBuyPrice: price1,
             nextSellPrice: price1,
@@ -95,6 +106,9 @@ impl GearHedger {
             scaleUp:  scaleUp,
             scaleDown:  scaleDown,
 
+            active: true,
+            target: f64::MAX,
+
             lastTradePrice: price0,
             nextBuyPrice: price0,
             nextSellPrice: price0,
@@ -111,6 +125,9 @@ impl GearHedger {
             gear_f: Gear::constant(exposure as i64),
             scaleUp: 1.0,
             scaleDown: 1.0,
+
+            active: true,
+            target: f64::MAX,
 
             lastTradePrice: 1.0,
             nextBuyPrice: 1.0,
@@ -130,6 +147,9 @@ impl GearHedger {
             scaleUp:  scaleUp,
             scaleDown:  scaleDown,
 
+            active: true,
+            target: f64::MAX,
+
             lastTradePrice: zero_price,
             nextBuyPrice: zero_price,
             nextSellPrice: zero_price,
@@ -146,6 +166,9 @@ impl GearHedger {
             scaleUp:  scaleUp,
             scaleDown:  scaleDown,
 
+            active: true,
+            target: f64::MAX,
+
             lastTradePrice: price0,
             nextBuyPrice: price0,
             nextSellPrice: price0,
@@ -158,6 +181,14 @@ impl GearHedger {
 }
 
 impl Agent for GearHedger {
+
+    // is active status
+    fn is_active(&self) -> bool {
+        self.active
+    }
+    fn deactivate(&mut self) {
+        self.active = false;
+    }
 
     // at the moment we never close, we need to add a way to add a delegate to decide closing of Agents
     fn to_be_closed(&self) -> bool {
@@ -241,28 +272,42 @@ impl<T: Agent> AgentInventory<T> {
             pl: 0.0,
         }
     }
+//
+//    pub fn deactivate(&mut self, key: &String) {
+//        self.agents.iter_mut().filter(|a| a.0 == key).map(|a| a.1.deactivate());
+//        ()
+//    }
 }
 
 impl<T: Agent> Agent for AgentInventory<T> {
+
+    fn is_active(&self) -> bool {
+        true
+    }
+    fn deactivate(&mut self) {
+        for (_,val) in self.agents.iter_mut() {
+            val.deactivate();
+        }
+    }
 
     fn to_be_closed(&self) -> bool {
         false
     }
 
     fn exposure(&self) -> i64 {
-        self.agents.iter().fold( 0, |a, b| a + b.1.exposure())
+        self.agents.iter().filter(|a| a.1.is_active()).fold( 0, |a, b| a + b.1.exposure())
     }
 
     fn next_exposure(&mut self, tick: &Tick) -> i64 {
         let mut exposure = 0;
-        for (_, val) in self.agents.iter_mut() {
+        for (_, val) in self.agents.iter_mut().filter(|a| a.1.is_active()) {
             exposure = exposure + val.next_exposure(tick);
         }
         exposure
     }
 
     fn update_on_fill(&mut self, order_fill: &OrderFill) {
-        for (_, val) in self.agents.iter_mut() {
+        for (_, val) in self.agents.iter_mut().filter(|a| a.1.is_active()) {
             val.update_on_fill(order_fill);
         }
     }
@@ -347,7 +392,7 @@ mod tests {
 
     #[test]
     fn symetric() {
-        let mut gear = GearHedger::symmetric(0.80, 1.20, 0.0010, 100000.0);
+        let mut gear = GearHedger::symmetric(0.80, 1.20, 0.0010, 0.0010, 100000.0);
         
         gear.next_exposure(&Tick{time:0, bid: 0.7000, ask: 0.7001,});
         gear.update_on_fill(&OrderFill{price: gear.tentative_price, units: gear.tentative_exposure});
