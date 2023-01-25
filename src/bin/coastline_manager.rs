@@ -75,10 +75,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut hedger =
         hedger_opt.unwrap_or_else(|| {
             let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
-            inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 0.0010, 422500.0));
+            //inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 0.0010, 422500.0));
             inventory
         });
-        //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
+    //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
     println!("{}", hedger_str);
@@ -89,7 +89,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     //let inv_str = serde_json::to_string(&inventory).ok().unwrap();
     //println!("{}", inv_str);
-    println!("{:?}", spectrum_client.get().await.unwrap().to_spectrum());
+    let sp = spectrum_client.get().await.unwrap().to_spectrum();
+    let os = sp.overshoots.iter().filter(|p| p.0 == 0.1).last().unwrap().1;
+
+    let mut cDir = os.direction;
+    let mut cOS = os.maxOS();
+
+    //println!("{:?}", spectrum_client.get().await.unwrap().to_spectrum());
 
     loop {
         // control loop counts and timing
@@ -99,6 +105,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
         iter = iter + 1;
         if iter > 10000 {
             break;
+        }
+
+        // now what we need to create a coastline agent
+        let sp = spectrum_client.get().await.map(|s| s.to_spectrum());
+        // if we get a spectrum from the service
+        if let Some(os) = sp.map(|e| e.overshoots.iter().filter(|p| p.0 == 0.1).last().unwrap().1) {
+            // reversal create a coastline agent
+            // all these things should be config at startup...
+            // scale: 0.0010  trading thresholds
+            // size: 10000    trading size at scale
+            // depth: 15      how many times size to accumulate
+            // altitude: 15   how many times size would we accumulate on the other side
+            // shift: 1       how many size are we shifted on entry
+            if os.direction != cDir {
+                let scale = 0.0010;
+                let size = 10000.0;
+                let target = scale * size;
+                let price = os.current;
+                let price0 = price - 15.0 * scale - os.direction.signum() as f64 * scale;
+                let pricen = price + 15.0 * scale - os.direction.signum() as f64 * scale;
+                let exposure0 = 15.0 * size;
+                let exposuren = -15.0 * size;
+                let mut agent = GAgent::Segment{price0: price0, exposure0: exposure0, pricen: pricen, exposuren: exposuren, scale: scale, target: 10.0}.build().unwrap();
+                let key = format!("coastline_{}", if os.direction > 0 {"short"} else {"long"});
+                eprintln!("Creating the agent on reversal: {:?}", agent);
+                // TODO check the target agent key status to see if we add, or re-activate a new one
+                if hedger.agents.get(&key).is_none() {
+                    hedger.agents.insert(key, agent);
+                }
+            }
+            // update the direction and current overshoot
+            cDir = os.direction;
+            cOS = os.maxOS();
         }
 
         // get the market tick
@@ -123,7 +162,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         // no trade
         if target_exposure == account_exposure {
-
             continue;
         }
 
@@ -133,28 +171,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
         eprintln!("Trading : {} to reach {} at price", target_exposure - account_exposure, target_exposure);
 
         client.post_order_request(&order).await.map_or(
-            eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),
+                eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),
             |order_fill| {
-                order_fill.get_order_fill().map_or(
-                    eprintln!("Cannot get the OrderFill from response, will try again next cycle"),
+                    order_fill.get_order_fill().map_or(
+                            eprintln!("Cannot get the OrderFill from response, will try again next cycle"),
                     |of| {
-                        hedger.update_on_fill(&of);
-                        let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
-                        println!("{}", hedger_str);
-                    },
+                                hedger.update_on_fill(&of);
+                                let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
+                                println!("{}", hedger_str);
+                            },
                 );
-            },
+                },
         );
-
-
-        /*
-                order_fill.map(|fill| {
-                    hedger.update_on_fill(&fill);
-                    let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
-                    println!("{}", hedger_str);
-                });
-        */
-        //println!("Agent: {} @ {:.5}", hedger.agentPL.exposure, hedger.agentPL.price_average);
+        // cleanup the closed agents
+        hedger.agents.retain(|key, ga| {
+            if ! ga.is_active() {
+                eprintln!("Removing agent {} inactivated on PL: {:.2} and exposure {}", key, ga.agentPL.cum_profit, ga.exposure());
+            }
+            ga.active
+        });
     }
 
     Ok(())

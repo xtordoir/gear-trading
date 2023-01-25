@@ -14,6 +14,7 @@ pub enum GAgent {
     JumpLong{price0: f64, scale: f64, exposure: f64},
     // Coastline trader agent with parameters as defined in golang
     Coastline{direction: i64, price0: f64, scale: f64, size: f64, imax: f64},
+    Segment{price0: f64, exposure0: f64, pricen: f64, exposuren: f64, scale: f64, target: f64},
 }
 
 impl GAgent {
@@ -25,6 +26,8 @@ impl GAgent {
             GAgent::JumpLong { price0: price0, scale: scale, exposure: exposure } => Some(GearHedger::jump(*price0, 1.0, 0.0, *scale, *scale, *exposure)),
             GAgent::Coastline { direction: direction, price0: price0, scale: scale, size: size, imax: imax } =>
                     Some(GearHedger::coastline(*direction, *price0, *scale, *size, *imax)),
+            GAgent::Segment { price0: price0, exposure0: exposure0, pricen: pricen, exposuren: exposuren, scale: scale, target: target } =>
+                    Some(GearHedger::segment(*price0, *exposure0, *pricen, *exposuren, *scale, *target)),
             _ => None,
         }
     }
@@ -97,7 +100,7 @@ impl GearHedger {
             nextBuyPrice: price1,
             nextSellPrice: price1,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: price1,
             tentative_exposure: 0,
         }
@@ -117,7 +120,7 @@ impl GearHedger {
             nextBuyPrice: price0,
             nextSellPrice: price0,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: price0,
             tentative_exposure: 0,
         }
@@ -137,7 +140,7 @@ impl GearHedger {
             nextBuyPrice: 1.0,
             nextSellPrice: 1.0,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: 1.0,
             tentative_exposure: 0,
         }
@@ -158,7 +161,7 @@ impl GearHedger {
             nextBuyPrice: zero_price,
             nextSellPrice: zero_price,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: zero_price,
             tentative_exposure: 0,
         }
@@ -177,7 +180,7 @@ impl GearHedger {
             nextBuyPrice: price0,
             nextSellPrice: price0,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: price0,
             tentative_exposure: 0,
         }
@@ -197,7 +200,33 @@ impl GearHedger {
             nextBuyPrice: price0,
             nextSellPrice: price0,
 
-            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, actual_cum_profit: 0.0 },
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
+            tentative_price: price0,
+            tentative_exposure: 0,
+        }
+    }
+    pub fn segment(price0: f64, exposure0: f64, pricen: f64, exposuren: f64, scale: f64, target: f64) -> Self {
+        let (g_0, g_1) = if exposure0.abs() > exposuren.abs() {
+            (1.0*exposure0.signum(), exposuren / exposure0.abs())
+        } else {
+            (exposure0 / exposuren.abs(), 1.0*exposuren.signum())
+        };
+        let max_exposure = exposure0.abs().max(exposuren.abs());
+
+        Self {
+            max_exposure: max_exposure,
+            gear_f: Gear::segment(price0, g_0, pricen, g_1),
+            scaleUp:  scale,
+            scaleDown:  scale,
+
+            active: true,
+            target: target,
+
+            lastTradePrice: price0,
+            nextBuyPrice: price0,
+            nextSellPrice: price0,
+
+            agentPL: AgentPL { exposure: 0, price_average: 0.0, cum_profit: 0.0, unrealized_pl: 0.0 },
             tentative_price: price0,
             tentative_exposure: 0,
         }
@@ -237,7 +266,16 @@ impl Agent for GearHedger {
     // thus we only trade if bid and ask entails the same direction of trade (buy or sell) and pick the
     // right of the two
     fn next_exposure(&mut self, tick: &Tick) -> i64 {
-
+        // deal with a profit above target
+        // we will trade to set exposure to zero and deactivate the agent.
+        let close_price = if self.exposure() > 0 {tick.bid} else {tick.ask};
+        if self.agentPL.pl_at_price(close_price) > self.target {
+            self.tentative_price = close_price;
+            self.tentative_exposure = 0;
+            self.deactivate();
+            return 0;
+        }
+        // otherwize,we check if we need to adjust exposure
         if tick.bid >= self.nextSellPrice {
             self.tentative_price = tick.bid;
             self.tentative_exposure = (self.gear_f.g(tick.bid) * self.max_exposure) as i64;
@@ -285,7 +323,7 @@ pub struct AgentPL {
     // cumulated profit (Estimated)
     pub cum_profit: f64,
     // cumulated profit (Actual)
-    pub actual_cum_profit: f64,
+    pub unrealized_pl: f64,
 }
 
 
@@ -346,8 +384,8 @@ impl<T: Agent> Agent for AgentInventory<T> {
 impl AgentPL {
     // total_profit compute the Process total profit for a given exit price
     pub fn total_profit(&mut self, x: f64) -> f64 {
-	    self.actual_cum_profit = self.cum_profit + (self.exposure as f64) * (x /self.price_average - 1.0);
-        self.actual_cum_profit
+	    self.unrealized_pl = (self.exposure as f64) * (x /self.price_average - 1.0);
+        self.unrealized_pl + self.cum_profit
     }
 
     pub fn pl_at_price(&self, x: f64) -> f64 {
@@ -365,6 +403,7 @@ impl AgentPL {
         let a = (self.price_average * self.exposure.abs() as f64 + x * de.abs() as f64) / e.abs() as f64;
         self.exposure = e;
         self.price_average = a;
+        self.unrealized_pl = self.exposure as f64 * (x / self.price_average - 1.0);
     }
 
     // DecreaseBy a number of Units (positive on Long exposure, negative on Short exposure)
@@ -375,6 +414,7 @@ impl AgentPL {
 
         self.exposure = e;
         self.cum_profit += pi;
+        self.unrealized_pl = self.exposure as f64 * (x / self.price_average - 1.0);
     }
 
     pub fn buy(&mut self, x: f64, units: i64) {
@@ -413,6 +453,7 @@ mod tests {
     use super::{GearHedger, Agent};
     use super::super::quote::Tick;
     use super::super::account::OrderFill;
+    use super::GAgent;
 
     #[test]
     fn exploration() {
@@ -437,6 +478,25 @@ mod tests {
 
     }
 
+    #[test]
+    fn target() {
+        let mut agent = GAgent::Segment{price0: 1.0010, exposure0: 100000.0, pricen: 1.0210, exposuren: -100000.0, scale: 0.0010, target: 10.0}.build().unwrap();
+        let tick_0 = Tick{time: 0, bid: 1.0100, ask: 1.0100};
+        agent.next_exposure(&tick_0);
+        let orderFill_0 = OrderFill{price: agent.tentative_price, units: agent.tentative_exposure};
+        agent.update_on_fill(&orderFill_0);
+
+        let tick_1 = Tick{time: 0, bid: 1.0120, ask: 1.0120};
+        agent.next_exposure(&tick_1);
+        let orderFill_1 = OrderFill{price: agent.tentative_price, units: agent.tentative_exposure};
+        agent.update_on_fill(&orderFill_1);
+
+        println!("{:?}", agent);
+        assert_eq!(agent.agentPL.cum_profit, 0.0);
+        assert_eq!(agent.exposure(), 10000);
+
+
+    }
 
 
 }
