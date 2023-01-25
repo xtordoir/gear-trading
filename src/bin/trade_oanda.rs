@@ -17,7 +17,6 @@ use gear_trading::hff::quote::Tick;
 use gear_trading::oanda::client::Client;
 use gear_trading::oanda::*;
 
-use gear_trading::hff::overshoot::SpectrumClient;
 use std::error::Error;
 use tokio::main;
 
@@ -36,16 +35,12 @@ struct Args {
     #[arg(short = 'f', long)]
     hedger_file: Option<String>,
 
-    #[arg(short = 's', long)]
-    spectrum_url: String,
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
-    let spectrum_url = args.spectrum_url;
-    let spectrum_client = SpectrumClient::new(spectrum_url);
 
     //let cp = args.hedgerfile.as_deref();
     let hedger_opt = args
@@ -75,21 +70,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut hedger =
         hedger_opt.unwrap_or_else(|| {
             let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
-            inventory.agents.insert(String::from("shortloser"), GearHedger::symmetric(1.0150, 1.0650, 0.0010, 0.0010, 422500.0));
             inventory
         });
         //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
     println!("{}", hedger_str);
-
-    //let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
-    //inventory.agents.insert(String::from("shortloser"), hedger.clone());
-    // inventory.agents.insert(String::from("bias"), DriftingHedge::new(4.0000, 422500, 2.0000));
-
-    //let inv_str = serde_json::to_string(&inventory).ok().unwrap();
-    //println!("{}", inv_str);
-    println!("{:?}", spectrum_client.get().await.unwrap().to_spectrum());
 
     loop {
         // control loop counts and timing
@@ -146,15 +132,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             },
         );
 
-
-        /*
-                order_fill.map(|fill| {
-                    hedger.update_on_fill(&fill);
-                    let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
-                    println!("{}", hedger_str);
-                });
-        */
-        //println!("Agent: {} @ {:.5}", hedger.agentPL.exposure, hedger.agentPL.price_average);
     }
 
     Ok(())
