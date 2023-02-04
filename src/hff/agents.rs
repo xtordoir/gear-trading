@@ -9,6 +9,7 @@ use super::super::{Gear, GearRange};
 
 #[derive(Debug,Deserialize,Serialize, Clone)]
 pub enum GAgent {
+    Symmetric{pmid: f64, span: f64, scale: f64, exposure: f64},
     Buy{price0: f64, price1: f64, scale: f64, exposure: f64},
     Sell{price0: f64, price1: f64, scale: f64, exposure: f64},
     JumpLong{price0: f64, scale: f64, exposure: f64},
@@ -21,6 +22,7 @@ impl GAgent {
     pub fn build(&self) -> Option<GearHedger> {
 
         match self {
+            GAgent::Symmetric { pmid: pmid, span: span, scale: scale, exposure: exposure } => Some(GearHedger::symmetric(*pmid - *span, *pmid + *span, *scale, *scale, *exposure) ),
             GAgent::Buy{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::buyer(*price0, *price1, *scale, *scale, *exposure)),
             GAgent::Sell{price0: price0, price1: price1, scale: scale, exposure: exposure} => Some(GearHedger::seller(*price0, *price1, *scale, *scale, *exposure)),
             GAgent::JumpLong { price0: price0, scale: scale, exposure: exposure } => Some(GearHedger::jump(*price0, 1.0, 0.0, *scale, *scale, *exposure)),
@@ -40,6 +42,9 @@ pub trait Agent {
 
     // computes the status of the Agent: should it be closed
     fn to_be_closed(&self) -> bool;
+
+    // actions to be done if PL is reaching target
+    fn target_action(&mut self) -> i64;
 
     // compute the agent exposure if trading this tick
     fn next_exposure(&mut self, tick: &Tick) -> i64;
@@ -253,6 +258,11 @@ impl Agent for GearHedger {
     fn exposure(&self) -> i64 {
         self.agentPL.exposure
     }
+    fn target_action(&mut self) -> i64 {
+        self.tentative_exposure = 0;
+        self.deactivate();
+        return 0;
+    }
 
     // BEWARE THIS IS BASED ON STRONG ASSUPTION
     // THAT WE ONLY SELL ON PRICE UP
@@ -268,12 +278,13 @@ impl Agent for GearHedger {
     fn next_exposure(&mut self, tick: &Tick) -> i64 {
         // deal with a profit above target
         // we will trade to set exposure to zero and deactivate the agent.
+        // TODO : call a closure defining the behaviour of the agent
+        // default would be to deactivate the agent
         let close_price = if self.exposure() > 0 {tick.bid} else {tick.ask};
         if self.agentPL.pl_at_price(close_price) > self.target {
             self.tentative_price = close_price;
-            self.tentative_exposure = 0;
-            self.deactivate();
-            return 0;
+            let e = self.target_action();
+            return e;
         }
         // otherwize,we check if we need to adjust exposure
         if tick.bid >= self.nextSellPrice {
@@ -363,6 +374,11 @@ impl<T: Agent> Agent for AgentInventory<T> {
 
     fn exposure(&self) -> i64 {
         self.agents.iter().filter(|a| a.1.is_active()).fold( 0, |a, b| a + b.1.exposure())
+    }
+
+    // we do nothing, it only happens on each individual Agent of the inventory
+    fn target_action(&mut self) -> i64 {
+        0
     }
 
     fn next_exposure(&mut self, tick: &Tick) -> i64 {
