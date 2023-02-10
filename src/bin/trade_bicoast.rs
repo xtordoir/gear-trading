@@ -36,8 +36,11 @@ struct Args {
     #[arg(short = 'f', long)]
     hedger_file: Option<String>,
 
+    #[arg(short = 'a', long)]
+   agent: Option<String>,
+
     #[arg(short = 'n', long)]
-    new_hedger: Option<bool>,
+   name: Option<String>,
 }
 
 #[tokio::main]
@@ -75,10 +78,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut hedger =
         hedger_opt.unwrap_or_else(|| {
             let mut inventory: AgentInventory<BiCoastAgent> = AgentInventory::new();
-            inventory.agents.insert(String::from("bicoast"), BiCoastAgent::new(1.0730, 0.0150, 0.0010, 150000.0, 10.0));
             inventory
         });
-        //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
+
+    if args.agent.is_some() && args.name.is_some() {
+        let agent = serde_json::from_str::<GBiAgent>(args.agent.unwrap().as_str()).ok().unwrap();
+        hedger.agents.insert(args.name.unwrap().clone(), agent.build());
+    }
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
     println!("{}", hedger_str);
@@ -89,7 +95,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             thread::sleep(delay);
         }
         iter = iter + 1;
-        if iter > 10000 {
+        if iter > 34500 {
             break;
         }
 
@@ -122,7 +128,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // create order
         let order = OrderRequest::new(target_exposure - account_exposure, "EUR_USD".to_string());
 
-        eprintln!("Trading : {} to reach {} at price", target_exposure - account_exposure, target_exposure);
+        eprintln!("Trading : {} to reach {} at price {}", target_exposure - account_exposure, target_exposure, tick.price());
 
         client.post_order_request(&order).await.map_or(
             eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),

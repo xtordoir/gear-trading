@@ -4,6 +4,20 @@ use super::agents::{GearHedger,Agent, GAgent};
 use super::account::OrderFill;
 use super::quote::Tick;
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GBiAgent {
+    price: f64,
+    span: f64,
+    scale: f64,
+    exposure: f64,
+    target: f64
+}
+
+impl GBiAgent {
+    pub fn build(&self) -> BiCoastAgent {
+        BiCoastAgent::new(self.price, self.span, self.scale, self.exposure, self.target)
+    }
+}
 
 /*
 BiCoastAgent is a symmetric GearHedger with specifications such that:
