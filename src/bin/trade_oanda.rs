@@ -88,17 +88,24 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
 
         // get the market tick
-        let tick = client
+        let tick_opt = client
             .get_pricing(String::from("EUR_USD"))
             .await
-            .unwrap()
-            .get_tick();
+            .map(|x| x.get_tick());
+        if tick_opt.is_none() {
+            continue;
+        }
+        let tick = tick_opt.unwrap();
 
         // time now
         let now = Utc::now().timestamp();
 
         // check account positions
-        let positions = client.get_open_positions().await.unwrap().to_position_vec();
+        let positions_opt = client.get_open_positions().await.map(|x| x.to_position_vec());
+        if positions_opt.is_none() {
+            continue;
+        }
+        let positions = positions_opt.unwrap();
         //println!("{:?}", positions);
 
         // compare target exposure with actual
