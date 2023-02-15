@@ -13,6 +13,7 @@ pub enum GAgent {
         span: f64,
         scale: f64,
         exposure: f64,
+        target: f64,
     },
     Buy {
         price0: f64,
@@ -57,12 +58,14 @@ impl GAgent {
                 span: span,
                 scale: scale,
                 exposure: exposure,
+                target: target,
             } => Some(GearHedger::symmetric(
                 *pmid - *span,
                 *pmid + *span,
                 *scale,
                 *scale,
                 *exposure,
+                *target,
             )),
             GAgent::Buy {
                 price0: price0,
@@ -264,6 +267,7 @@ impl GearHedger {
         scaleUp: f64,
         scaleDown: f64,
         max_exposure: f64,
+        target: f64,
     ) -> Self {
         let zero_price = (price0 + price1) / 2.0;
         Self {
@@ -273,7 +277,7 @@ impl GearHedger {
             scaleDown: scaleDown,
 
             active: true,
-            target: f64::MAX,
+            target: target,
 
             lastTradePrice: zero_price,
             nextBuyPrice: zero_price,
