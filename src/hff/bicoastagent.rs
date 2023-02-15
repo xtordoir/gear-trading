@@ -6,11 +6,11 @@ use super::quote::Tick;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct GBiAgent {
-    price: f64,
-    span: f64,
-    scale: f64,
-    exposure: f64,
-    target: f64
+    pub price: f64,
+    pub span: f64,
+    pub scale: f64,
+    pub exposure: f64,
+    pub target: f64
 }
 
 impl GBiAgent {
@@ -39,7 +39,7 @@ impl BiCoastAgent {
     pub fn new(price: f64, span: f64, scale: f64, exposure: f64, target: f64) -> Self {
         let mut ret = Self {
             epoch_target: scale * exposure / span,
-            gear_hedger: GAgent::Symmetric{pmid: price, span: span, scale: scale, exposure: exposure}.build().unwrap(),
+            gear_hedger: GAgent::Symmetric{pmid: price, span: span, scale: scale, exposure: exposure, target: target}.build().unwrap(),
         };
         ret.epoch_target = target;
         ret.gear_hedger.target = target;
@@ -57,7 +57,12 @@ impl BiCoastAgent {
             pmid: price,
             span: span,
             scale: self.gear_hedger.scaleUp,
-            exposure: self.gear_hedger.max_exposure}.build().unwrap().gear_f;
+            exposure: self.gear_hedger.max_exposure,
+            target: self.gear_hedger.target}.build().unwrap().gear_f;
+    }
+
+    pub fn pl(&self) -> f64 {
+        self.gear_hedger.agentPL.cum_profit
     }
 }
 
