@@ -35,6 +35,11 @@ struct Args {
     #[arg(short = 'f', long)]
     hedger_file: Option<String>,
 
+    #[arg(short = 'a', long)]
+   agent: Option<String>,
+
+    #[arg(short = 'n', long)]
+   name: Option<String>,
 }
 
 #[tokio::main]
@@ -72,7 +77,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let mut inventory: AgentInventory<GearHedger> = AgentInventory::new();
             inventory
         });
-        //GearHedger::symmetric(1.0150, 1.0650, 0.0010, 422500.0));
+
+    if args.agent.is_some() && args.name.is_some() {
+        let agent = serde_json::from_str::<GAgent>(args.agent.unwrap().as_str()).ok().unwrap().build();
+        hedger.agents.insert(args.name.unwrap().clone(), agent.unwrap());
+    }
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
     println!("{}", hedger_str);
