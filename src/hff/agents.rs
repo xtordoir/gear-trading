@@ -8,6 +8,14 @@ use std::error::Error;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub enum GAgent {
+    OHLC {
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        scale: f64,
+        exposure: f64,
+    },
     Symmetric {
         pmid: f64,
         span: f64,
@@ -53,6 +61,23 @@ pub enum GAgent {
 impl GAgent {
     pub fn build(&self) -> Option<GearHedger> {
         match self {
+            GAgent::OHLC {
+                open: open,
+                high: high,
+                low: low,
+                close: close,
+                scale: scale,
+                exposure: exposure,
+            } => {
+                // price to zero exposure
+                let zerop = if open < close {close} else {open};
+                // check where to set exposure at extremes
+                let exposure0 = exposure.min(exposure * (zerop - low) / (high - zerop));
+                let exposuren = - exposure.min(exposure * (high - zerop) / (zerop - low));
+                Some(GearHedger::segment(
+                        *low, exposure0, *high, exposuren, *scale, f64::MAX,
+            ))
+            },
             GAgent::Symmetric {
                 pmid: pmid,
                 span: span,
