@@ -40,6 +40,9 @@ struct Args {
 
     #[arg(short = 'n', long)]
    name: Option<String>,
+
+    #[clap(long)]
+    dry: bool,
 }
 
 #[tokio::main]
@@ -87,6 +90,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("{}", hedger_str);
 
     loop {
+        if args.dry {
+            break;
+        }
         // control loop counts and timing
         if iter != 0 {
             thread::sleep(delay);

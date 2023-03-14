@@ -15,6 +15,7 @@ pub enum GAgent {
         close: f64,
         scale: f64,
         exposure: f64,
+        target: Option<f64>,
     },
     Symmetric {
         pmid: f64,
@@ -68,14 +69,16 @@ impl GAgent {
                 close: close,
                 scale: scale,
                 exposure: exposure,
+                target: target,
             } => {
                 // price to zero exposure
                 let zerop = if open < close {close} else {open};
                 // check where to set exposure at extremes
                 let exposure0 = exposure.min(exposure * (zerop - low) / (high - zerop));
                 let exposuren = - exposure.min(exposure * (high - zerop) / (zerop - low));
+                let actualTarget = target.unwrap_or(f64::MAX);
                 Some(GearHedger::segment(
-                        *low, exposure0, *high, exposuren, *scale, f64::MAX,
+                        *low, exposure0, *high, exposuren, *scale, actualTarget,
             ))
             },
             GAgent::Symmetric {
@@ -85,7 +88,7 @@ impl GAgent {
                 exposure: exposure,
                 target: target,
             } => Some(GearHedger::symmetric(
-                *pmid - *span,
+                    *pmid - *span,
                 *pmid + *span,
                 *scale,
                 *scale,
@@ -98,7 +101,7 @@ impl GAgent {
                 scale: scale,
                 exposure: exposure,
             } => Some(GearHedger::buyer(
-                *price0, *price1, *scale, *scale, *exposure,
+                    *price0, *price1, *scale, *scale, *exposure,
             )),
             GAgent::Sell {
                 price0: price0,
@@ -106,14 +109,14 @@ impl GAgent {
                 scale: scale,
                 exposure: exposure,
             } => Some(GearHedger::seller(
-                *price0, *price1, *scale, *scale, *exposure,
+                    *price0, *price1, *scale, *scale, *exposure,
             )),
             GAgent::JumpLong {
                 price0: price0,
                 scale: scale,
                 exposure: exposure,
             } => Some(GearHedger::jump(
-                *price0, 1.0, 0.0, *scale, *scale, *exposure,
+                    *price0, 1.0, 0.0, *scale, *scale, *exposure,
             )),
             GAgent::Coastline {
                 direction: direction,
@@ -122,7 +125,7 @@ impl GAgent {
                 size: size,
                 imax: imax,
             } => Some(GearHedger::coastline(
-                *direction, *price0, *scale, *size, *imax,
+                    *direction, *price0, *scale, *size, *imax,
             )),
             GAgent::Segment {
                 price0: price0,
@@ -132,13 +135,15 @@ impl GAgent {
                 scale: scale,
                 target: target,
             } => Some(GearHedger::segment(
-                *price0, *exposure0, *pricen, *exposuren, *scale, *target,
+                    *price0, *exposure0, *pricen, *exposuren, *scale, *target,
             )),
             _ => None,
         }
     }
 }
 pub trait Agent {
+
+    fn close(&mut self, tick :&Tick) -> i64;
     // active status
     fn is_active(&self) -> bool;
     fn deactivate(&mut self);
@@ -199,6 +204,7 @@ pub struct GearHedger {
 }
 
 impl GearHedger {
+
     pub fn buyer(
         price0: f64,
         price1: f64,
@@ -415,6 +421,18 @@ impl GearHedger {
 }
 
 impl Agent for GearHedger {
+
+    fn close(&mut self, tick :&Tick) -> i64 {
+        // otherwize,we check if we need to adjust exposure
+        if self.agentPL.exposure > 0 {
+            self.tentative_price = tick.bid;
+        } else {
+            self.tentative_price = tick.ask;
+        }
+        self.tentative_exposure = 0;
+        0
+    }
+
     // is active status
     fn is_active(&self) -> bool {
         self.active
@@ -538,6 +556,14 @@ impl<T: Agent> AgentInventory<T> {
 }
 
 impl<T: Agent> Agent for AgentInventory<T> {
+
+    fn close(&mut self, tick :&Tick) -> i64 {
+        for (_, val) in self.agents.iter_mut() {
+            val.close(tick);
+        }
+        0
+    }
+
     fn is_active(&self) -> bool {
         true
     }
@@ -665,7 +691,7 @@ mod tests {
 
     #[test]
     fn symetric() {
-        let mut gear = GearHedger::symmetric(0.80, 1.20, 0.0010, 0.0010, 100000.0);
+        let mut gear = GearHedger::symmetric(0.80, 1.20, 0.0010, 0.0010, 100000.0, 100000.0);
 
         gear.next_exposure(&Tick {
             time: 0,
