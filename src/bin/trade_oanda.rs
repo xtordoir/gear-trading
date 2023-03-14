@@ -43,6 +43,9 @@ struct Args {
 
     #[clap(long)]
     dry: bool,
+
+    #[clap(long)]
+    clean: bool,
 }
 
 #[tokio::main]
@@ -84,6 +87,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if args.agent.is_some() && args.name.is_some() {
         let agent = serde_json::from_str::<GAgent>(args.agent.unwrap().as_str()).ok().unwrap().build();
         hedger.agents.insert(args.name.unwrap().clone(), agent.unwrap());
+    }
+
+    if args.clean {
+        hedger.agents.retain(|_name, agent| agent.active);
     }
 
     let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
