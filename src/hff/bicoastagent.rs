@@ -67,6 +67,14 @@ impl BiCoastAgent {
 }
 
 impl Agent for BiCoastAgent {
+
+    // NOT IMPLEMENTED!
+    fn close(&mut self, tick :&Tick) -> i64 {
+        // otherwize,we check if we need to adjust exposure
+
+        0
+    }
+
     fn is_active(&self) -> bool {
         true
     }
