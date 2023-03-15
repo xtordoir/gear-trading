@@ -17,6 +17,16 @@ pub enum GAgent {
         exposure: f64,
         target: Option<f64>,
     },
+    // Coastline trader agent with parameters as defined in golang
+    CL {
+        direction: i64,
+        price: f64,
+        scale: f64,
+        size: f64,
+        i0: Option<f64>,
+        imax: f64,
+        target: Option<f64>,
+    },
     Symmetric {
         pmid: f64,
         span: f64,
@@ -79,6 +89,28 @@ impl GAgent {
                 let actualTarget = target.unwrap_or(f64::MAX);
                 Some(GearHedger::segment(
                         *low, exposure0, *high, exposuren, *scale, actualTarget,
+            ))
+            },
+            GAgent::CL {
+                direction: direction,
+                price: price,
+                scale: scale,
+                size: size,
+                i0: i0,
+                imax: imax,
+                target: target,
+            } => {
+                let shift = i0.unwrap_or(1.0) * *scale;
+                let zerop = if *direction > 0 { *price + shift} else { *price - shift };
+
+                let high = zerop + imax * scale;
+                let low = zerop - imax * scale;
+
+                let actualTarget = target.unwrap_or(size * scale);
+                let exposure = *size * *imax;
+
+                Some(GearHedger::segment(
+                        low, exposure, high, -exposure, *scale, actualTarget,
             ))
             },
             GAgent::Symmetric {
