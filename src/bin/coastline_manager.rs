@@ -186,6 +186,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // cleanup the closed agents
         hedger.agents.retain(|key, ga| {
             if ! ga.is_active() {
+                // we need total profit, cum_profit doesnt contain the closing trade, this is a bug
                 eprintln!("Removing agent {} inactivated on PL: {:.2} and exposure {}", key, ga.agentPL.cum_profit, ga.exposure());
             }
             ga.active

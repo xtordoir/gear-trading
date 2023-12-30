@@ -2,6 +2,7 @@ use serde::{Serialize,Deserialize};
 
 pub mod hff;
 pub mod oanda;
+pub mod lean;
 
 // GearRange defines exposure gear linear between price limits
 #[derive(Debug,Deserialize,Serialize, Clone)]

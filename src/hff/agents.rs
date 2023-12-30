@@ -237,6 +237,41 @@ pub struct GearHedger {
 
 impl GearHedger {
 
+    /** method used to merge 2 GearHedger
+    */
+    pub fn merge_flat(&mut self, other: &GearHedger) -> Self {
+        // compute the price range
+        let p_0 = self.gear_f.p_0.min(other.gear_f.p_0);
+        let p_n = self.gear_f.p_n.max(other.gear_f.p_n);
+
+        // compute the exposure range, then resulting gear and max_exposure
+        let low_gear = self.gear_f.g_0 * self.max_exposure + other.gear_f.g_0 * other.max_exposure;
+        let high_gear = self.gear_f.g_n * self.max_exposure + other.gear_f.g_n * other.max_exposure;
+
+        // highest of the absolute gears
+        let max_exposure = low_gear.abs().max(high_gear.abs());
+        let g_0 = low_gear / max_exposure;
+        let g_n = high_gear / max_exposure;
+
+        let gear = Gear::segment(p_0, g_0, p_n, g_n);
+        // lets trade at the average scales
+        let scaleUp = (self.scaleUp + other.scaleUp) / 2.0;
+        let scaleDown = (self.scaleDown + other.scaleDown) / 2.0;
+        let scale = (scaleUp + scaleDown) / 2.0;
+
+        // what the hell will be the target?
+        // At least the sum of the two...plus the accumulated losses
+        let target = self.target + other.target - self.agentPL.cum_profit - other.agentPL.cum_profit;
+        // how much has been realized: buy-sell net * price difference...
+        // if the exposures are different signs, then we are realizing some pl
+        let mut agent: GearHedger = GAgent::Segment { price0: p_0, exposure0: low_gear, pricen: p_n, exposuren: high_gear, scale: scale, target: target }.build().unwrap();
+        agent.update_on_fill(&OrderFill { price: self.agentPL.price_average, units: self.agentPL.exposure });
+        agent.update_on_fill(&OrderFill { price: other.agentPL.price_average, units: other.agentPL.exposure });
+        agent.active = true;
+
+        return agent;
+    }
+
     pub fn buyer(
         price0: f64,
         price1: f64,
