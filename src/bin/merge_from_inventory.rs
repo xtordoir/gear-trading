@@ -17,15 +17,19 @@ struct Args {
 
     #[arg(short = 'm', long)]
     name2: String,
+
+    #[arg(short = 'o', long)]
+    outname: String,
 }
 
 fn main() {
     let args = Args::parse();
     let name1: &str = args.name1.as_str();
     let name2: &str = args.name2.as_str();
+    let outname = args.outname;
 
     // read the input inventory file
-    let hedger = args
+    let mut hedger = args
         .hedger_file
         .as_deref()
         .map(|f| {
@@ -40,7 +44,11 @@ fn main() {
     let agent2 = hedger.agents.get(name2).unwrap();
 
     let agent = agent1.merge_flat(agent2);
+    hedger.agents.insert(outname, agent);
+    hedger.agents.remove(name1);
+    hedger.agents.remove(name2);
 
-    println!("max exposure: {}\n", agent);
+    let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
+    println!("{}", hedger_str);
 
 }

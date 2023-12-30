@@ -118,6 +118,11 @@ impl Agent for BiCoastAgent {
         self.gear_hedger.update_on_fill(order_fill)
     }
 
+    fn next_exposure_and_fill(&mut self, order_fill: &OrderFill) {
+        self.next_exposure(&Tick{bid: order_fill.price, ask: order_fill.price, time: 0});
+        self.update_on_fill(order_fill);
+    }
+
     // current exposure of the agent
     fn exposure(&self) -> i64 {
         self.gear_hedger.exposure()

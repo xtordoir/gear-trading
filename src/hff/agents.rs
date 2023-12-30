@@ -200,6 +200,9 @@ pub trait Agent {
     // compute the new state after trading occured with a target exposure and Order fill at a price
     fn update_on_fill(&mut self, order_fill: &OrderFill);
 
+    // set the next exposure and execute the order fill at the same time and price
+    fn next_exposure_and_fill(&mut self, order_fill: &OrderFill);
+
     // current exposure of the agent
     fn exposure(&self) -> i64;
 }
@@ -239,7 +242,7 @@ impl GearHedger {
 
     /** method used to merge 2 GearHedger
     */
-    pub fn merge_flat(&mut self, other: &GearHedger) -> Self {
+    pub fn merge_flat(& self, other: &GearHedger) -> Self {
         // compute the price range
         let p_0 = self.gear_f.p_0.min(other.gear_f.p_0);
         let p_n = self.gear_f.p_n.max(other.gear_f.p_n);
@@ -265,8 +268,9 @@ impl GearHedger {
         // how much has been realized: buy-sell net * price difference...
         // if the exposures are different signs, then we are realizing some pl
         let mut agent: GearHedger = GAgent::Segment { price0: p_0, exposure0: low_gear, pricen: p_n, exposuren: high_gear, scale: scale, target: target }.build().unwrap();
-        agent.update_on_fill(&OrderFill { price: self.agentPL.price_average, units: self.agentPL.exposure });
-        agent.update_on_fill(&OrderFill { price: other.agentPL.price_average, units: other.agentPL.exposure });
+        agent.next_exposure_and_fill(&OrderFill { price: self.agentPL.price_average, units: self.agentPL.exposure });
+        agent.next_exposure_and_fill(&OrderFill { price: other.agentPL.price_average, units: other.agentPL.exposure });
+
         agent.active = true;
 
         return agent;
@@ -572,6 +576,12 @@ impl Agent for GearHedger {
         self.target_exposure(tick)
     }
 
+    fn next_exposure_and_fill(&mut self, order_fill: &OrderFill) {
+        self.tentative_price = order_fill.price;
+        self.tentative_exposure = self.tentative_exposure + order_fill.units;
+        self.update_on_fill(order_fill);
+    }
+
     fn update_on_fill(&mut self, order_fill: &OrderFill) {
         let traded = self.tentative_exposure - self.agentPL.exposure;
         if traded < 0 {
@@ -674,6 +684,10 @@ impl<T: Agent> Agent for AgentInventory<T> {
         for (_, val) in self.agents.iter_mut().filter(|a| a.1.is_active()) {
             val.update_on_fill(order_fill);
         }
+    }
+    fn next_exposure_and_fill(&mut self, order_fill: &OrderFill) {
+        self.next_exposure(&Tick{bid: order_fill.price, ask: order_fill.price, time: 0});
+        self.update_on_fill(order_fill);
     }
 }
 
