@@ -594,7 +594,7 @@ impl Agent for GearHedger {
             self.lastTradePrice = order_fill.price;
             self.nextBuyPrice = order_fill.price - self.scaleDown;
             self.nextSellPrice = order_fill.price + self.scaleUp;
-        }
+        } 
         if self.to_be_closed() {
             self.deactivate()
         }

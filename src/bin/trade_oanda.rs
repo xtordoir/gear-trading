@@ -97,9 +97,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("{}", hedger_str);
 
     loop {
-        if args.dry {
-            break;
-        }
+        
         // control loop counts and timing
         if iter != 0 {
             thread::sleep(delay);
@@ -123,29 +121,57 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let now = Utc::now().timestamp();
 
         // check account positions
-        let positions_opt = client.get_open_positions().await.map(|x| x.to_position_vec());
-        if positions_opt.is_none() {
-            continue;
+        // not supported for fractional units!
+ //20250404       let positions_opt = client.get_open_positions().await.map(|x| x.to_position_vec());
+ // only EUR_USD should work
+        let position_opt = client.get_position(String::from("EUR_USD")).await;
+ 
+        if position_opt.is_none() {
+            println!("positions_opt is NONE :(");
+            if args.dry {break;} else {continue;}
         }
-        let positions = positions_opt.unwrap();
+//20250404        let positions = positions_opt.unwrap();
+        let position = position_opt.unwrap();
+
         //println!("{:?}", positions);
 
         // compare target exposure with actual
         let target_exposure = hedger.next_exposure(&tick);
-        let account_exposure = positions.iter().filter(|p| p.instrument == "EUR_USD").last().map_or_else(|| 0, |p| p.units);
+//20250404        let account_exposure = positions.iter().filter(|p| p.instrument == "EUR_USD").last().map_or_else(|| 0, |p| p.units);
+        let account_exposure = position.to_position().units;
         //println!("Target Exposure: {}", target_exposure);
         //println!("Actual Exposure: {}", account_exposure);
 
         // no trade
         if target_exposure == account_exposure {
-
-            continue;
+            if args.dry {
+                println!("Target Exposure: {} = Actual Exposure: {}", target_exposure, account_exposure);
+                break;
+            } else {
+                continue;
+            }
         }
 
         // create order
         let order = OrderRequest::new(target_exposure - account_exposure, "EUR_USD".to_string());
 
         eprintln!("Trading : {} to reach {} at price", target_exposure - account_exposure, target_exposure);
+
+        if args.dry {
+            eprintln!("Dry run, No Trading : {} to reach {} at price", target_exposure - account_exposure, target_exposure);
+            let orderFill = OrderFill{
+                price: tick.price(),
+                units: target_exposure - account_exposure,
+            };
+            hedger.update_on_fill(&orderFill);
+            // well update the unrealzedpl
+            for (_, val) in hedger.agents.iter_mut().filter(|a| a.1.is_active()) {
+                val.agentPL.unrealized_pl = val.agentPL.uPL(orderFill.price);
+            }
+            let hedger_str = serde_json::to_string(&hedger).ok().unwrap();
+            println!("{}", hedger_str);
+            break;
+        }
 
         client.post_order_request(&order).await.map_or(
             eprintln!("Cannot get the Post Order to Oanda, will try again next cycle"),

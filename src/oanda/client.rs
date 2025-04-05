@@ -38,6 +38,22 @@ impl Client {
         None
     }
 
+    pub async fn get_position(&self, instrument: String) -> Option<PositionResponse> {
+        let request_url = format!("{}/v3/accounts/{}/positions/{}",self.url.clone(), self.account, instrument);
+
+        let response: Result<reqwest::Response, reqwest::Error> = self.client
+            .get(request_url)
+            .bearer_auth(self.token.clone())
+            .send()
+            .await;
+        
+        //println!("positions call result... {:?}", response.unwrap().json::<PositionResponse>().await.unwrap());
+        if let Some(res) = response.ok() {
+            return res.json().await.ok();
+        }
+        None
+    }
+
     pub async fn get_open_positions(&self,) -> Option<OpenPositionsResponse> {
         let request_url = format!("{}/v3/accounts/{}/openPositions",self.url.clone(), self.account);
 

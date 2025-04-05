@@ -11,6 +11,46 @@ pub struct SideResponse {
     averagePrice: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionResponse {
+    #[serde(rename = "lastTransactionID")]
+    pub last_transaction_id: String,
+    pub position: PositionStruct,
+}
+impl PositionResponse {
+    pub fn to_position(&self) -> Position {
+        let units = match self.position.long.units != "0" {
+            true => self.position.long.units.parse().unwrap(),
+            false => self.position.short.units.parse().unwrap(),
+        };
+
+            let price = if self.position.long.units != "0"
+            { self.position.long.averagePrice.as_ref().map(|p| p.parse().unwrap())}
+            else { self.position.short.averagePrice.as_ref().map(|p| p.parse().unwrap()) };
+
+            let position = Position {
+                instrument: self.position.instrument.clone(),
+                units: units,
+                price: price
+            };
+        return position;
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PositionStruct {
+    pub instrument: String,
+    pub long: SideResponse,
+    pub pl: String,
+    #[serde(rename = "resettablePL")]
+    pub resettable_pl: String,
+    pub short: SideResponse,
+    #[serde(rename = "unrealizedPL")]
+    pub unrealized_pl: String,
+}
+
 #[derive(Deserialize, Debug)]
 pub struct PositionsResponse {
     instrument: String,
